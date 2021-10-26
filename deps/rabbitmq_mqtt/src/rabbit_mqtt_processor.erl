@@ -66,9 +66,13 @@ process_frame(#mqtt_frame{ fixed = #mqtt_frame_fixed{ type = Type }},
     {error, connect_expected, PState};
 process_frame(Frame = #mqtt_frame{ fixed = #mqtt_frame_fixed{ type = Type }},
               PState) ->
-    case process_request(Type, Frame, PState) of
+    try process_request(Type, Frame, PState) of
         {ok, PState1} -> {ok, PState1, PState1#proc_state.connection};
         Ret -> Ret
+    catch
+        _:{{shutdown, {server_initiated_close, 403, _}}, _} ->
+            %% This was already logged by the channel process, so we only need to send proper MQTT status.
+            {error, access_refused, PState}
     end.
 
 add_client_id_to_adapter_info(ClientId, #amqp_adapter_info{additional_info = AdditionalInfo0} = AdapterInfo) ->
